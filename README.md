@@ -9,8 +9,12 @@ TODO: Add pin layout, a basic description of code and libraries needed, and how 
 
 To Run:
 Set up the Arduino:
-* (TODO): Add instructions on pin layout and code uploading
+* As the [MFRC522 library](https://github.com/miguelbalboa/rfid) suggests, setup the arduino according to the following wiring diagram (From [this youtube Tutorial](https://www.youtube.com/watch?v=QSx778Gr6Y4))
+* ![Wiring Diagram](images\RFID_arduino_wiring.png)
 
+* Using the [Arduino IDE](https://www.arduino.cc/en/software), upload the [the Arduino Sketch](arduino_src\RFID_ReadWrite.ino) to the board. It should run and open a serial port automatically.
+    * Using the COM Port in which the IDE detects the arduino (below: COM4 is detected for our setup), edit [the server python code](server_src\RFID_Server.py) to set `COM_PORT` to the appropriate value.
+    * ![COM4 port example](images\Com_port_screenshot.png)
 * After downloading the server code and setting up the arduino, run the server-side code: `python3 <path_to_code>/RFID_Server.py`
     * The arduino must be powered on and running the correct code for this to work properly.
 * Follow the code instructions - enter `R` to read the current state of the RFID card, or `W` to write a new message.
