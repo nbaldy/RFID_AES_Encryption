@@ -8,7 +8,9 @@
 import serial
 import numpy as np
 import math
+import time
 
+COM_PORT = "COM4"
 ser = None
 
 # S-boxes from online(https://en.wikipedia.org/wiki/Rijndael_S-box)
@@ -268,38 +270,88 @@ def printbytes(byte_arr, str_descript):
         bytestr+=hex_str + " "
     print(str_descript + ": ", bytestr)
 
+def bytesToStr(byte_arr):
+    str_bytes = ""
+    for byte in byte_arr:
+        str_bytes+=chr(byte)
+    return str_bytes
+
+def readAllWaitingSerialMsgs(ser):
+    response = ser.readline()
+    while(response != None and len(response) > 0 ):
+        print("Response: ", response) # Status information
+        response = ser.readline()
+        time.sleep(0.1)
+
+# Arduino code adds extra bytes between hex values. Remove these.
+def StripExtraBytesConvertToString(byte_str):
+    result = []
+    
+    # Expect 16 actual bytes - each 2-char byte is separated by a space
+    for i in range(16):
+        byte_two_chars = chr(byte_str[3*i+1]) + chr(byte_str[3*i+2])
+        result.append(int(byte_two_chars, 16))
+
+    return result
+
+
+
 def main():
-    # ser = serial.Serial(port = "COM4", baudrate = 9600)
+    ser = serial.Serial(port = COM_PORT, baudrate = 9600, timeout = 5)
 
     # Key should be 4 words = 16 Bytes (for AES-128) bytes - this is a very insecure key but shows how the process works
     key = "ComputerNetworks"
     key_arr_bytes = [ord(char) for char in key]
-    
+
+    # Ensure buffer is flushed and ready    
+    ser.write(bytes("read", 'utf-8'))
+    ser.reset_input_buffer()
 
     while (True):
+        # Synchronization - should have gotten "Would you like to read or write"
+        response = ser.readline()
+        while(response[:5] != b'Would'):
+            if(response == b'' or response is None):
+                print("ERROR: missynchronization detected! Please restart")
+                return
+            print("Response detected: ", response)
+            response = ser.readline()
+        ser.reset_input_buffer()
+
         user_in = input("'R' to read, 'W' to write, enter to stop: ")
         if(len(user_in) is 0):
             break
         if(user_in.upper()[0] is "R"):
-            serial.send("read")
-            ser_bytes = ser.readline()
-            response = unencrypt(ser_bytes, key_arr_bytes)
-            print("Response is: ", response)
+            ser.write(bytes("read", 'utf-8'))
+            
+            # Print all responses up to actual data message.
+            response = ser.readline()
+            while(response != None  and len(response) > 0  and response[:4] != b'Data'):
+                print("Response: ", response) # Status information
+                response = ser.readline()
+                time.sleep(0.1)
+            
+            if (response[:4] == b'Data'):
+                # Data is ready - get next line
+                response = ser.readline()
+                print("Response: ", bytesToStr(response))
+                encrypted = StripExtraBytesConvertToString(response)
+                print("Response (encrypted): ", bytesToStr(encrypted))
+                unencrypted = unencrypt(encrypted, key_arr_bytes)
+                print("Response: ", bytesToStr(unencrypted))
+            else:
+                # Attempt to read timed out before scan
+                print("Timeout before card scan.")
             continue
         elif(user_in.upper()[0] is "W"):
+            readAllWaitingSerialMsgs(ser)
+            ser.write(bytes("write", 'utf-8'))
             user_in = input("What to send? Max 16 chars: ")
             input_byte_arr = [ord(char) for char in user_in]
-            print(input_byte_arr, type(input_byte_arr))
-            to_send = encrypt(input_byte_arr[:16], key_arr_bytes)
-            # serial.send(to_send)
-            printbytes(input_byte_arr[:16], "Input in bytes")
-            printbytes(key_arr_bytes, "Key in bytes")
-            printbytes(to_send, "Encrypted in bytes")
-            unencrypted = unencrypt(to_send, key_arr_bytes)
-            strsent = ""
-            for byte in unencrypted:
-                strsent+=chr(byte)
-            print("DID YOU SEND", strsent)
+            encrypted = encrypt(input_byte_arr[:16], key_arr_bytes)
+            to_send = (encrypted)
+            ser.write(to_send)
+            # Expect 2 Status messages - see in response detected
             continue
         print("Unrecognized input")
 
