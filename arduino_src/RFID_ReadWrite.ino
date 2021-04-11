@@ -23,7 +23,7 @@
 MFRC522 mfrc522(SS_PIN, RST_PIN);        // instatiate a MFRC522 reader object.
 MFRC522::MIFARE_Key key;//create a MIFARE_Key struct named 'key', which will hold the card information
 char command = 'a';
-byte towrite[16];
+byte towrite[19];
 
 void setup() {
   Serial.begin(9600);        // Initialize serial communications with the PC
@@ -71,11 +71,13 @@ void loop()
       {
         Serial.println("enter 16 bytes of data: ");
         while (Serial.available() < 16) {}
-        Serial.readBytes(towrite, 16);
+        Serial.readBytes(towrite,  19);
 
         Serial.println("command read: ");
+        // Pyserial seems to add 3 junk characters at the beginning, remove these
         for (int i = 0; i < 16; i++)
         {
+          towrite[i] = towrite[i+3];
           Serial.print(towrite[i], HEX);
           Serial.print(" ");
         }
@@ -87,7 +89,7 @@ void loop()
     }
     else
     {
-      Serial.println("invalid command, please try again");
+      Serial.println("invalid command");
       Serial.println("Would you like to read or write? (r/w)");
     }
   }
